@@ -351,7 +351,7 @@ public class ProgressPage extends SetupWizardPage
     {
       if (getTrigger() == Trigger.BOOTSTRAP)
       {
-        launchButton = buttonBar.addCheckButton("Launch automatically", "Launch the installed product when all setup tasks have performed successfully", true,
+        launchButton = buttonBar.addCheckButton("Launch automatically", "Launch the installed product when all setup tasks have performed successfully", false,
             "launchAutomatically");
       }
       else

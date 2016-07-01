@@ -3,7 +3,9 @@
 
 <product name="Eclipse Installer" uid="org.eclipse.oomph.setup.installer.product" id="org.eclipse.oomph.setup.installer.product" application="org.eclipse.oomph.setup.installer.application" version="1.4.0.qualifier" useFeatures="true" includeLaunchers="true">
 
+
    <configIni use="">
+      <win32>/org.eclipse.oomph.setup.installer.product/resources/config.ini</win32>
    </configIni>
 
    <launcherArgs>
@@ -20,6 +22,7 @@ Eclipse Installer
       </programArgsLin>
       <vmArgs>-Xms256M
 -Xmx1024M
+-Doomph.redirection.oasp=index:/redirectable.products.setup-&gt;https://raw.githubusercontent.com/themetalone/oomph-server/master/v1.0/com.github.products.oasp4j.setup
       </vmArgs>
       <vmArgsMac>-XstartOnFirstThread
 -Dorg.eclipse.swt.internal.carbon.smallFonts
@@ -40,6 +43,7 @@ Eclipse Installer
       </win>
    </launcher>
 
+
    <vm>
    </vm>
 
@@ -56,5 +60,12 @@ Eclipse Installer
       <plugin id="org.eclipse.equinox.ds" autoStart="true" startLevel="2" />
       <plugin id="org.eclipse.equinox.simpleconfigurator" autoStart="true" startLevel="1" />
    </configurations>
+
+   <preferencesInfo>
+      <targetfile overwrite="false"/>
+   </preferencesInfo>
+
+   <cssInfo>
+   </cssInfo>
 
 </product>
