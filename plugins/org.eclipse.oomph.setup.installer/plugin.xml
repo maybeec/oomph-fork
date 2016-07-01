@@ -54,10 +54,10 @@
 
    	<extension id="product" point="org.eclipse.core.runtime.products">
       	<product
-        	name="%product.name"
+        	name="Eclipse Installer"
           description="%product.description"
           application="org.eclipse.oomph.setup.installer.application">
-        		<property name="appName" value="%application.name"/>
+        		<property name="appName" value="Eclipse Installer"/>
       	</product>
    	</extension>
 
