@@ -25,6 +25,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author Eike Stepper
@@ -179,6 +180,16 @@ public abstract class OS
   public Process execute(List<String> command, boolean terminal) throws Exception
   {
     ProcessBuilder processBuilder = new ProcessBuilder(command);
+    try
+    {
+      Map<String, String> environment = processBuilder.environment();
+      environment.remove("SWT_GTK3");
+    }
+    catch (UnsupportedOperationException ex)
+    {
+      // Ignore.
+    }
+
     Process process = processBuilder.start();
     process.getInputStream().close();
     process.getOutputStream().close();
@@ -219,6 +230,46 @@ public abstract class OS
   public String getExecutableName(String launcherName)
   {
     return launcherName;
+  }
+
+  public static String getCurrentLauncher(boolean console)
+  {
+    try
+    {
+      String launcher = PropertiesUtil.getProperty("eclipse.launcher");
+      if (launcher != null)
+      {
+        File launcherFile = new File(launcher);
+        if (launcherFile.isFile())
+        {
+          File result = IOUtil.getCanonicalFile(launcherFile);
+          if (INSTANCE.isWin())
+          {
+            // If we don't need a console, but actually ended up here with eclipsec.exe, we don't try to find the product-specifically named executable.
+            if (console)
+            {
+              File parentFolder = result.getParentFile();
+              if (parentFolder != null)
+              {
+                File consoleLauncher = new File(parentFolder, "eclipsec.exe");
+                if (consoleLauncher.isFile())
+                {
+                  return consoleLauncher.getPath();
+                }
+              }
+            }
+          }
+
+          return result.getPath();
+        }
+      }
+    }
+    catch (Throwable ex)
+    {
+      //$FALL-THROUGH$
+    }
+
+    return null;
   }
 
   public abstract String getGitPrefix();

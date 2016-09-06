@@ -23,6 +23,7 @@ import org.eclipse.oomph.setup.git.GitCloneTask;
 import org.eclipse.oomph.setup.git.GitPackage;
 import org.eclipse.oomph.setup.impl.SetupTaskImpl;
 import org.eclipse.oomph.setup.util.FileUtil;
+import org.eclipse.oomph.util.MonitorUtil;
 import org.eclipse.oomph.util.OS;
 import org.eclipse.oomph.util.ObjectUtil;
 import org.eclipse.oomph.util.ReflectUtil;
@@ -42,7 +43,6 @@ import org.eclipse.emf.ecore.util.InternalEList;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.OperationCanceledException;
-import org.eclipse.core.runtime.SubProgressMonitor;
 import org.eclipse.egit.core.EclipseGitProgressTransformer;
 import org.eclipse.jgit.api.CheckoutCommand;
 import org.eclipse.jgit.api.CloneCommand;
@@ -57,6 +57,7 @@ import org.eclipse.jgit.api.SubmoduleUpdateCommand;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.lib.ConfigConstants;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.lib.Repository;
@@ -93,6 +94,7 @@ import java.util.Set;
  *   <li>{@link org.eclipse.oomph.setup.git.impl.GitCloneTaskImpl#getCheckoutBranch <em>Checkout Branch</em>}</li>
  *   <li>{@link org.eclipse.oomph.setup.git.impl.GitCloneTaskImpl#isRecursive <em>Recursive</em>}</li>
  *   <li>{@link org.eclipse.oomph.setup.git.impl.GitCloneTaskImpl#getConfigSections <em>Config Sections</em>}</li>
+ *   <li>{@link org.eclipse.oomph.setup.git.impl.GitCloneTaskImpl#isRestrictToCheckoutBranch <em>Restrict To Checkout Branch</em>}</li>
  * </ul>
  *
  * @generated
@@ -228,6 +230,26 @@ public class GitCloneTaskImpl extends SetupTaskImpl implements GitCloneTask
    * @ordered
    */
   protected EList<ConfigSection> configSections;
+
+  /**
+   * The default value of the '{@link #isRestrictToCheckoutBranch() <em>Restrict To Checkout Branch</em>}' attribute.
+   * <!-- begin-user-doc -->
+   * <!-- end-user-doc -->
+   * @see #isRestrictToCheckoutBranch()
+   * @generated
+   * @ordered
+   */
+  protected static final boolean RESTRICT_TO_CHECKOUT_BRANCH_EDEFAULT = false;
+
+  /**
+   * The cached value of the '{@link #isRestrictToCheckoutBranch() <em>Restrict To Checkout Branch</em>}' attribute.
+   * <!-- begin-user-doc -->
+   * <!-- end-user-doc -->
+   * @see #isRestrictToCheckoutBranch()
+   * @generated
+   * @ordered
+   */
+  protected boolean restrictToCheckoutBranch = RESTRICT_TO_CHECKOUT_BRANCH_EDEFAULT;
 
   private boolean workDirExisted;
 
@@ -408,6 +430,32 @@ public class GitCloneTaskImpl extends SetupTaskImpl implements GitCloneTask
    * <!-- end-user-doc -->
    * @generated
    */
+  public boolean isRestrictToCheckoutBranch()
+  {
+    return restrictToCheckoutBranch;
+  }
+
+  /**
+   * <!-- begin-user-doc -->
+   * <!-- end-user-doc -->
+   * @generated
+   */
+  public void setRestrictToCheckoutBranch(boolean newRestrictToCheckoutBranch)
+  {
+    boolean oldRestrictToCheckoutBranch = restrictToCheckoutBranch;
+    restrictToCheckoutBranch = newRestrictToCheckoutBranch;
+    if (eNotificationRequired())
+    {
+      eNotify(new ENotificationImpl(this, Notification.SET, GitPackage.GIT_CLONE_TASK__RESTRICT_TO_CHECKOUT_BRANCH, oldRestrictToCheckoutBranch,
+          restrictToCheckoutBranch));
+    }
+  }
+
+  /**
+   * <!-- begin-user-doc -->
+   * <!-- end-user-doc -->
+   * @generated
+   */
   @Override
   public NotificationChain eInverseRemove(InternalEObject otherEnd, int featureID, NotificationChain msgs)
   {
@@ -468,6 +516,8 @@ public class GitCloneTaskImpl extends SetupTaskImpl implements GitCloneTask
         return isRecursive();
       case GitPackage.GIT_CLONE_TASK__CONFIG_SECTIONS:
         return getConfigSections();
+      case GitPackage.GIT_CLONE_TASK__RESTRICT_TO_CHECKOUT_BRANCH:
+        return isRestrictToCheckoutBranch();
     }
     return super.eGet(featureID, resolve, coreType);
   }
@@ -505,6 +555,9 @@ public class GitCloneTaskImpl extends SetupTaskImpl implements GitCloneTask
         getConfigSections().clear();
         getConfigSections().addAll((Collection<? extends ConfigSection>)newValue);
         return;
+      case GitPackage.GIT_CLONE_TASK__RESTRICT_TO_CHECKOUT_BRANCH:
+        setRestrictToCheckoutBranch((Boolean)newValue);
+        return;
     }
     super.eSet(featureID, newValue);
   }
@@ -540,6 +593,9 @@ public class GitCloneTaskImpl extends SetupTaskImpl implements GitCloneTask
       case GitPackage.GIT_CLONE_TASK__CONFIG_SECTIONS:
         getConfigSections().clear();
         return;
+      case GitPackage.GIT_CLONE_TASK__RESTRICT_TO_CHECKOUT_BRANCH:
+        setRestrictToCheckoutBranch(RESTRICT_TO_CHECKOUT_BRANCH_EDEFAULT);
+        return;
     }
     super.eUnset(featureID);
   }
@@ -568,6 +624,8 @@ public class GitCloneTaskImpl extends SetupTaskImpl implements GitCloneTask
         return recursive != RECURSIVE_EDEFAULT;
       case GitPackage.GIT_CLONE_TASK__CONFIG_SECTIONS:
         return configSections != null && !configSections.isEmpty();
+      case GitPackage.GIT_CLONE_TASK__RESTRICT_TO_CHECKOUT_BRANCH:
+        return restrictToCheckoutBranch != RESTRICT_TO_CHECKOUT_BRANCH_EDEFAULT;
     }
     return super.eIsSet(featureID);
   }
@@ -598,6 +656,8 @@ public class GitCloneTaskImpl extends SetupTaskImpl implements GitCloneTask
     result.append(checkoutBranch);
     result.append(", recursive: ");
     result.append(recursive);
+    result.append(", restrictToCheckoutBranch: ");
+    result.append(restrictToCheckoutBranch);
     result.append(')');
     return result.toString();
   }
@@ -694,7 +754,7 @@ public class GitCloneTaskImpl extends SetupTaskImpl implements GitCloneTask
       String remoteName = getRemoteName();
       String remoteURI = getRemoteURI();
       String pushURI = getPushURI();
-      configureRepository(context, repository, checkoutBranch, remoteName, remoteURI, pushURI, getConfigSections());
+      configureRepository(context, repository, checkoutBranch, isRestrictToCheckoutBranch(), remoteName, remoteURI, pushURI, getConfigSections());
 
       hasCheckout = repository.getAllRefs().containsKey("refs/heads/" + checkoutBranch);
       if (!hasCheckout)
@@ -743,13 +803,14 @@ public class GitCloneTaskImpl extends SetupTaskImpl implements GitCloneTask
         {
           if (cachedGit == null)
           {
-            cachedGit = cloneRepository(context, workDir, checkoutBranch, remoteName, remoteURI, isRecursive(), new SubProgressMonitor(monitor, 50));
+            cachedGit = cloneRepository(context, workDir, checkoutBranch, isRestrictToCheckoutBranch(), remoteName, remoteURI, isRecursive(),
+                MonitorUtil.create(monitor, 50));
             cachedRepository = cachedGit.getRepository();
 
             if (!URI.createURI(remoteURI).isFile())
             {
               String pushURI = getPushURI();
-              configureRepository(context, cachedRepository, checkoutBranch, remoteName, remoteURI, pushURI, getConfigSections());
+              configureRepository(context, cachedRepository, checkoutBranch, isRestrictToCheckoutBranch(), remoteName, remoteURI, pushURI, getConfigSections());
             }
 
             monitor.worked(1);
@@ -769,7 +830,7 @@ public class GitCloneTaskImpl extends SetupTaskImpl implements GitCloneTask
 
           if (isRecursive())
           {
-            addSubmodules(context, cachedGit, new SubProgressMonitor(monitor, 20));
+            addSubmodules(context, cachedGit, MonitorUtil.create(monitor, 20));
           }
         }
 
@@ -861,8 +922,8 @@ public class GitCloneTaskImpl extends SetupTaskImpl implements GitCloneTask
     }
   }
 
-  private static Git cloneRepository(SetupTaskContext context, File workDir, String checkoutBranch, String remoteName, String remoteURI, boolean recursive,
-      IProgressMonitor monitor) throws Exception
+  private static Git cloneRepository(SetupTaskContext context, File workDir, String checkoutBranch, boolean restrictToCheckoutBranch, String remoteName,
+      String remoteURI, boolean recursive, IProgressMonitor monitor) throws Exception
   {
     context.log("Cloning Git repo " + remoteURI + " to " + workDir);
 
@@ -870,15 +931,20 @@ public class GitCloneTaskImpl extends SetupTaskImpl implements GitCloneTask
     command.setNoCheckout(true);
     command.setURI(remoteURI);
     command.setRemote(remoteName);
-    command.setBranchesToClone(Collections.singleton(checkoutBranch));
+    command.setCloneAllBranches(!restrictToCheckoutBranch);
+    if (restrictToCheckoutBranch)
+    {
+      command.setBranchesToClone(Collections.singleton(Constants.R_HEADS + checkoutBranch));
+    }
+
     command.setDirectory(workDir);
     command.setTimeout(60);
     command.setProgressMonitor(new EclipseGitProgressTransformer(monitor));
     return command.call();
   }
 
-  private static void configureRepository(SetupTaskContext context, Repository repository, String checkoutBranch, String remoteName, String remoteURI,
-      String pushURI, List<? extends ConfigSection> configSections) throws Exception, IOException
+  private static void configureRepository(SetupTaskContext context, Repository repository, String checkoutBranch, boolean restrictToCheckoutBranch,
+      String remoteName, String remoteURI, String pushURI, List<? extends ConfigSection> configSections) throws Exception, IOException
   {
     StoredConfig config = repository.getConfig();
 
@@ -982,6 +1048,43 @@ public class GitCloneTaskImpl extends SetupTaskImpl implements GitCloneTask
     {
       config.save();
     }
+
+    if (restrictToCheckoutBranch)
+    {
+      changed |= setSingleFetchRefSpec(context, config, checkoutBranch, remoteName);
+    }
+  }
+
+  /**
+   * Adjust the fetch ref spec for a single branch clone.
+   */
+  private static boolean setSingleFetchRefSpec(SetupTaskContext context, StoredConfig config, String checkoutBranch, String remoteName) throws Exception
+  {
+    for (RemoteConfig remoteConfig : RemoteConfig.getAllRemoteConfigs(config))
+    {
+      if (remoteName.equals(remoteConfig.getName()))
+      {
+        RefSpec oldRrefSpec = new RefSpec();
+        oldRrefSpec = oldRrefSpec.setForceUpdate(true);
+        oldRrefSpec = oldRrefSpec.setSourceDestination(Constants.R_HEADS + "*", Constants.R_REMOTES + remoteName + "/*");
+
+        final String src = Constants.R_HEADS + checkoutBranch;
+        final String dst = Constants.R_REMOTES + remoteName + "/" + checkoutBranch;
+        RefSpec newRefSpec = new RefSpec();
+        newRefSpec = newRefSpec.setForceUpdate(true);
+        newRefSpec = newRefSpec.setSourceDestination(src, dst);
+
+        if (remoteConfig.addFetchRefSpec(newRefSpec) && remoteConfig.removeFetchRefSpec(oldRrefSpec) && context.isPerforming())
+        {
+          context.log("Setting fetch ref spec for single branch clone");
+        }
+
+        remoteConfig.update(config);
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private static void handleProperty(Map<String, Map<String, Map<String, List<String>>>> properties, String sectionName, String subsectionName,
@@ -1132,7 +1235,7 @@ public class GitCloneTaskImpl extends SetupTaskImpl implements GitCloneTask
     command.call();
   }
 
-  private static void addSubmodules(SetupTaskContext context, Git git, SubProgressMonitor monitor) throws Exception
+  private static void addSubmodules(SetupTaskContext context, Git git, IProgressMonitor monitor) throws Exception
   {
     context.log("Adding submodules");
 

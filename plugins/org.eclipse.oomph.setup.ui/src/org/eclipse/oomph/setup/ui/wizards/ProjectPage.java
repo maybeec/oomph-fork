@@ -18,6 +18,7 @@ import org.eclipse.oomph.setup.CatalogSelection;
 import org.eclipse.oomph.setup.Index;
 import org.eclipse.oomph.setup.Project;
 import org.eclipse.oomph.setup.ProjectCatalog;
+import org.eclipse.oomph.setup.ProjectContainer;
 import org.eclipse.oomph.setup.Scope;
 import org.eclipse.oomph.setup.SetupFactory;
 import org.eclipse.oomph.setup.SetupPackage;
@@ -151,6 +152,7 @@ import org.eclipse.swt.widgets.TableColumn;
 import org.eclipse.swt.widgets.ToolBar;
 import org.eclipse.swt.widgets.ToolItem;
 import org.eclipse.swt.widgets.Tree;
+import org.eclipse.ui.dialogs.PatternFilter;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -323,7 +325,32 @@ public class ProjectPage extends SetupWizardPage
     catalogSelector.configure(catalogsButton);
     AccessUtil.setKey(catalogsButton, "catalogs");
 
-    FilteredTreeWithoutWorkbench.WithCheckboxes filteredTree = new FilteredTreeWithoutWorkbench.WithCheckboxes(upperComposite, SWT.BORDER | SWT.MULTI);
+    PatternFilter patternFilter = new PatternFilter()
+    {
+      @Override
+      protected boolean isLeafMatch(Viewer viewer, Object element)
+      {
+        boolean result = super.isLeafMatch(viewer, element);
+        if (!result)
+        {
+          if (element instanceof Project)
+          {
+            Project project = (Project)element;
+            ProjectContainer projectContainer = project.getProjectContainer();
+            if (projectContainer instanceof Project)
+            {
+              Project parentProject = (Project)projectContainer;
+              return isLeafMatch(viewer, parentProject);
+            }
+          }
+        }
+
+        return result;
+      }
+    };
+
+    FilteredTreeWithoutWorkbench.WithCheckboxes filteredTree = new FilteredTreeWithoutWorkbench.WithCheckboxes(upperComposite, SWT.BORDER | SWT.MULTI,
+        patternFilter, null);
     Control filterControl = filteredTree.getChildren()[0];
     filterControl.setParent(filterPlaceholder);
     AccessUtil.setKey(filteredTree.getFilterControl(), "filter");
@@ -331,23 +358,73 @@ public class ProjectPage extends SetupWizardPage
     projectViewer = filteredTree.getViewer();
     projectViewer.setCheckStateProvider(new ICheckStateProvider()
     {
-      public boolean isGrayed(Object element)
+      private Set<ProjectContainer> projectContainers;
+
+      private boolean containsAll(List<Project> projects)
       {
-        if (element instanceof Project)
+        if (projects.isEmpty())
         {
-          Project project = (Project)element;
-          return project.getStreams().isEmpty();
+          return true;
+        }
+
+        for (Project project : projects)
+        {
+          if (!projectContainers.contains(project))
+          {
+            // Ignore empty leaf projects.
+            if (project.getProjects().isEmpty() && project.getStreams().isEmpty())
+            {
+              continue;
+            }
+
+            return false;
+          }
+
+          if (!containsAll(project.getProjects()))
+          {
+            return false;
+          }
         }
 
         return true;
       }
 
+      public boolean isGrayed(Object element)
+      {
+        Workspace workspace = getWorkspace();
+        if (workspace == null)
+        {
+          return false;
+        }
+
+        projectContainers = new HashSet<ProjectContainer>();
+        for (Stream stream : workspace.getStreams())
+        {
+          for (ProjectContainer projectContainer = stream.getProject(); projectContainer != null; projectContainer = projectContainer.getProjectContainer())
+          {
+            projectContainers.add(projectContainer);
+          }
+        }
+
+        ProjectContainer projectContainer = (ProjectContainer)element;
+        return !containsAll(projectContainer.getProjects());
+      }
+
       public boolean isChecked(Object element)
       {
-        if (element instanceof Project)
+        Workspace workspace = getWorkspace();
+        if (workspace != null)
         {
-          Project project = (Project)element;
-          return isSelected(project);
+          for (Stream stream : workspace.getStreams())
+          {
+            for (ProjectContainer projectContainer = stream.getProject(); projectContainer != null; projectContainer = projectContainer.getProjectContainer())
+            {
+              if (projectContainer == element)
+              {
+                return true;
+              }
+            }
+          }
         }
 
         return false;
@@ -448,7 +525,8 @@ public class ProjectPage extends SetupWizardPage
           if (!projects.isEmpty())
           {
             projectViewer.setSelection(new StructuredSelection(projects), true);
-            addSelectedProjects();
+            addProjects(projects);
+            addProjectButton.setEnabled(false);
             gotoNextPage();
             return true;
           }
@@ -675,11 +753,31 @@ public class ProjectPage extends SetupWizardPage
         if (element instanceof Project)
         {
           Project project = (Project)element;
-          handleCheckProject(project);
+          EList<Stream> streams = project.getStreams();
+          if (!streams.isEmpty())
+          {
+            Workspace workspace = getWorkspace();
+            if (workspace != null)
+            {
+              for (Stream stream : workspace.getStreams())
+              {
+                if (streams.contains(stream))
+                {
+                  removeStreams(Collections.singletonList(stream), false);
+                  addButton.setEnabled(true);
+                  return;
+                }
+              }
+            }
 
-          boolean expanded = projectViewer.getExpandedState(element);
-          projectViewer.setExpandedState(element, !expanded);
+            addProjects(Collections.singletonList(project));
+            addButton.setEnabled(false);
+            return;
+          }
         }
+
+        boolean expanded = projectViewer.getExpandedState(element);
+        projectViewer.setExpandedState(element, !expanded);
       }
     });
 
@@ -687,13 +785,55 @@ public class ProjectPage extends SetupWizardPage
     {
       public void checkStateChanged(CheckStateChangedEvent event)
       {
-        Object element = event.getElement();
-        if (element instanceof Project)
+        ProjectContainer element = (ProjectContainer)event.getElement();
+        projectViewer.setSelection(new StructuredSelection(element));
+
+        List<Stream> streams = new ArrayList<Stream>();
+        Workspace workspace = getWorkspace();
+        if (workspace != null)
         {
-          Project project = (Project)element;
-          projectViewer.setSelection(new StructuredSelection(project));
-          handleCheckProject(project);
+          for (Stream stream : workspace.getStreams())
+          {
+            if (!existingStreams.contains(EcoreUtil.getURI(stream)))
+            {
+              for (ProjectContainer projectContainer = stream.getProject(); projectContainer != null; projectContainer = projectContainer.getProjectContainer())
+              {
+                if (projectContainer == element)
+                {
+                  streams.add(stream);
+                }
+              }
+            }
+          }
         }
+
+        if (streams.isEmpty())
+        {
+          List<Project> projects = new ArrayList<Project>();
+          if (element instanceof Project)
+          {
+            projects.add((Project)element);
+          }
+          else
+          {
+            projects.addAll(element.getProjects());
+          }
+
+          for (int i = 0; i < projects.size(); ++i)
+          {
+            projects.addAll(projects.get(i).getProjects());
+          }
+
+          addProjects(projects);
+          addButton.setEnabled(false);
+        }
+        else
+        {
+          removeStreams(streams, false);
+          addButton.setEnabled(!(element instanceof Project && ((Project)element).getStreams().isEmpty()));
+        }
+
+        projectViewer.refresh();
       }
     });
 
@@ -727,7 +867,7 @@ public class ProjectPage extends SetupWizardPage
           }
           else
           {
-            streamViewer.setSelection(new StructuredSelection(selectedProjectStreams));
+            streamViewer.setSelection(new StructuredSelection(selectedProjectStreams), true);
             removeSelectedStreams();
           }
         }
@@ -781,6 +921,7 @@ public class ProjectPage extends SetupWizardPage
         else if (event.keyCode == SWT.INSERT && addButton.isEnabled())
         {
           addSelectedProjects();
+          addProjectButton.setEnabled(false);
         }
       }
     });
@@ -808,29 +949,6 @@ public class ProjectPage extends SetupWizardPage
     }
   }
 
-  protected void handleCheckProject(Project project)
-  {
-    Workspace workspace = getWorkspace();
-    if (workspace != null)
-    {
-      for (Stream stream : workspace.getStreams())
-      {
-        if (stream.getProject() == project)
-        {
-          streamViewer.setSelection(new StructuredSelection(stream));
-          removeSelectedStreams();
-          return;
-        }
-      }
-    }
-
-    if (!project.getStreams().isEmpty())
-    {
-      addSelectedProjects();
-      addButtonAnimator.getButton().setEnabled(false);
-    }
-  }
-
   @Override
   public void enterPage(boolean forward)
   {
@@ -854,6 +972,10 @@ public class ProjectPage extends SetupWizardPage
             {
               indexLoader.awaitIndexLoad();
             }
+
+            // Hide the view while we're updating it with input and then a selection to avoid flickering.
+            Tree tree = projectViewer.getTree();
+            tree.setRedraw(false);
 
             CatalogSelection selection = catalogSelector.getSelection();
             projectViewer.setInput(selection);
@@ -896,6 +1018,8 @@ public class ProjectPage extends SetupWizardPage
             {
               projectViewer.setSelection(new StructuredSelection(projects), true);
             }
+
+            tree.setRedraw(true);
 
             checkPageComplete();
           }
@@ -1074,6 +1198,22 @@ public class ProjectPage extends SetupWizardPage
 
   private void addSelectedProjects()
   {
+    List<Project> projects = new ArrayList<Project>();
+    IStructuredSelection selection = (IStructuredSelection)projectViewer.getSelection();
+    for (Object element : selection.toArray())
+    {
+      if (element instanceof Project)
+      {
+        Project project = (Project)element;
+        projects.add(project);
+      }
+    }
+
+    addProjects(projects);
+  }
+
+  private void addProjects(List<Project> projects)
+  {
     projectsChanged = true;
 
     List<Project> addedProjects = new ArrayList<Project>();
@@ -1083,27 +1223,21 @@ public class ProjectPage extends SetupWizardPage
     CatalogSelection catalogSelection = catalogManager.getSelection();
     EMap<Project, Stream> defaultStreams = catalogSelection.getDefaultStreams();
 
-    IStructuredSelection selection = (IStructuredSelection)projectViewer.getSelection();
-    for (Iterator<?> it = selection.iterator(); it.hasNext();)
+    for (Project project : projects)
     {
-      Object element = it.next();
-      if (element instanceof Project)
+      EList<Stream> projectStreams = project.getStreams();
+      if (!projectStreams.isEmpty())
       {
-        Project project = (Project)element;
-        EList<Stream> projectStreams = project.getStreams();
-        if (!projectStreams.isEmpty())
+        if (!isSelected(project))
         {
-          if (!isSelected(project))
+          Stream stream = defaultStreams.get(project);
+          if (stream == null)
           {
-            Stream stream = defaultStreams.get(project);
-            if (stream == null)
-            {
-              stream = projectStreams.get(0);
-            }
-
-            addedStreams.add(stream);
-            addedProjects.add(project);
+            stream = projectStreams.get(0);
           }
+
+          addedStreams.add(stream);
+          addedProjects.add(project);
         }
       }
     }
@@ -1129,14 +1263,26 @@ public class ProjectPage extends SetupWizardPage
       catalogSelection.getSelectedStreams().addAll(workspace.getStreams());
       catalogManager.saveSelection();
 
-      streamViewer.setSelection(new StructuredSelection(addedStreams));
-      projectViewer.update(addedProjects.toArray(), null);
+      streamViewer.setSelection(new StructuredSelection(addedStreams), true);
+      projectViewer.refresh();
 
       checkPageComplete();
     }
   }
 
   private void removeSelectedStreams()
+  {
+    List<Stream> streams = new ArrayList<Stream>();
+    IStructuredSelection selection = (IStructuredSelection)streamViewer.getSelection();
+    for (Object element : selection.toArray())
+    {
+      streams.add((Stream)element);
+    }
+
+    removeStreams(streams, true);
+  }
+
+  private void removeStreams(List<Stream> streams, boolean select)
   {
     projectsChanged = true;
 
@@ -1146,12 +1292,12 @@ public class ProjectPage extends SetupWizardPage
       EList<Stream> workspaceStreams = workspace.getStreams();
       List<Project> removedProjects = new ArrayList<Project>();
 
-      IStructuredSelection selection = (IStructuredSelection)streamViewer.getSelection();
-      for (Iterator<?> it = selection.iterator(); it.hasNext();)
+      int selectionIndex = -1;
+      for (Stream stream : streams)
       {
-        Stream stream = (Stream)it.next();
         if (!existingStreams.contains(EcoreUtil.getURI(stream)))
         {
+          selectionIndex = Math.max(selectionIndex, workspaceStreams.indexOf(stream) - 1);
           workspaceStreams.remove(stream);
           Project project = stream.getProject();
           removedProjects.add(project);
@@ -1160,8 +1306,10 @@ public class ProjectPage extends SetupWizardPage
 
       if (!removedProjects.isEmpty())
       {
-        projectViewer.update(removedProjects.toArray(), null);
-        projectViewer.setSelection(new StructuredSelection(removedProjects));
+        if (select)
+        {
+          projectViewer.setSelection(new StructuredSelection(removedProjects));
+        }
 
         CatalogManager catalogManager = catalogSelector.getCatalogManager();
         CatalogSelection catalogSelection = catalogManager.getSelection();
@@ -1170,8 +1318,14 @@ public class ProjectPage extends SetupWizardPage
         catalogManager.saveSelection();
 
         streamViewer.refresh();
+        projectViewer.refresh();
 
         checkPageComplete();
+      }
+
+      if (streamViewer.getSelection().isEmpty() && !workspaceStreams.isEmpty())
+      {
+        streamViewer.setSelection(new StructuredSelection(workspaceStreams.get(selectionIndex <= 0 ? 0 : selectionIndex)), true);
       }
     }
   }

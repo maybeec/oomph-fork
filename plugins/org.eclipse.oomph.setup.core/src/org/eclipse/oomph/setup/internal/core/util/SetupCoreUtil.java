@@ -26,6 +26,7 @@ import org.eclipse.oomph.setup.internal.core.SetupContext;
 import org.eclipse.oomph.setup.internal.core.SetupCorePlugin;
 import org.eclipse.oomph.setup.internal.core.util.ECFURIHandlerImpl.AuthorizationHandler;
 import org.eclipse.oomph.setup.internal.core.util.ECFURIHandlerImpl.AuthorizationHandlerImpl;
+import org.eclipse.oomph.setup.util.SetupUtil;
 import org.eclipse.oomph.util.IOUtil;
 import org.eclipse.oomph.util.OS;
 import org.eclipse.oomph.util.PropertiesUtil;
@@ -56,6 +57,7 @@ import org.eclipse.emf.ecore.resource.URIConverter;
 import org.eclipse.emf.ecore.resource.URIHandler;
 import org.eclipse.emf.ecore.resource.impl.ResourceSetImpl;
 import org.eclipse.emf.ecore.util.EcoreUtil;
+import org.eclipse.emf.ecore.xmi.impl.EcoreResourceFactoryImpl;
 
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.equinox.p2.core.IProvisioningAgent;
@@ -88,6 +90,21 @@ public final class SetupCoreUtil
   public static final String STATS_URI = "http://download.eclipse.org/stats/oomph";
 
   public static final AuthorizationHandler AUTHORIZATION_HANDLER;
+
+  public static Resource.Factory.Registry RESOURCE_FACTORY_REGISTRY = new ResourceSetImpl().getResourceFactoryRegistry();
+
+  static
+  {
+    Resource.Factory factory = new BaseResourceFactoryImpl();
+
+    Map<String, Object> extensionToFactoryMap = RESOURCE_FACTORY_REGISTRY.getExtensionToFactoryMap();
+    extensionToFactoryMap.put("setup", factory);
+    extensionToFactoryMap.put("targlet", factory);
+    extensionToFactoryMap.put("def", factory);
+    extensionToFactoryMap.put("ext", factory);
+
+    extensionToFactoryMap.put("ecore", new EcoreResourceFactoryImpl());
+  }
 
   private static final boolean SKIP_STATS = PropertiesUtil.isProperty(SetupProperties.PROP_SETUP_STATS_SKIP);
 
@@ -136,13 +153,7 @@ public final class SetupCoreUtil
 
   public static void configureResourceSet(final ResourceSet resourceSet)
   {
-    Resource.Factory factory = new BaseResourceFactoryImpl();
-
-    Map<String, Object> extensionToFactoryMap = resourceSet.getResourceFactoryRegistry().getExtensionToFactoryMap();
-    extensionToFactoryMap.put("setup", factory);
-    extensionToFactoryMap.put("targlet", factory);
-    extensionToFactoryMap.put("def", factory);
-    extensionToFactoryMap.put("ext", factory);
+    resourceSet.getResourceFactoryRegistry().getExtensionToFactoryMap().putAll(RESOURCE_FACTORY_REGISTRY.getExtensionToFactoryMap());
 
     URIConverter uriConverter = resourceSet.getURIConverter();
     Map<URI, URI> uriMap = uriConverter.getURIMap();
@@ -359,8 +370,7 @@ public final class SetupCoreUtil
       }
     }
 
-    if (SetupContext.INDEX_SETUP_ARCHIVE_LOCATION_URI != null && !PropertiesUtil.isProperty(SetupProperties.PROP_REDIRECTION_BASE + "mirror.nothing")
-        && SetupContext.INDEX_SETUP_LOCATION_URI.equals(uriConverter.normalize(SetupContext.INDEX_SETUP_LOCATION_URI)))
+    if (!SetupUtil.SETUP_ARCHIVER_APPLICATION)
     {
       handleArchiveRedirection(uriConverter);
     }
@@ -368,7 +378,8 @@ public final class SetupCoreUtil
 
   private static void handleArchiveRedirection(URIConverter uriConverter)
   {
-    if (archiveExpectedETag == null || !archiveExpectedETag.equals(ECFURIHandlerImpl.getExpectedETag(SetupContext.INDEX_SETUP_ARCHIVE_LOCATION_URI)))
+    if (archiveExpectedETag == null
+        || !archiveExpectedETag.equals(ECFURIHandlerImpl.getExpectedETag(uriConverter.normalize(SetupContext.INDEX_SETUP_ARCHIVE_LOCATION_URI))))
     {
       // long start = System.currentTimeMillis();
 
@@ -1065,5 +1076,39 @@ public final class SetupCoreUtil
 
       return result;
     }
+  }
+
+  public static URI getEclipseBrandingImage()
+  {
+    return URI.createPlatformPluginURI("org.eclipse.oomph.setup.ui/icons/committers.png", true);
+  }
+
+  public static URI getBrandingImageURI(Scope scope)
+  {
+    URI imageURI = null;
+
+    if (scope != null)
+    {
+      Annotation annotation = scope.getAnnotation(AnnotationConstants.ANNOTATION_BRANDING_INFO);
+      if (annotation == null)
+      {
+        return getBrandingImageURI(scope.getParentScope());
+      }
+
+      String detail = annotation.getDetails().get(AnnotationConstants.KEY_IMAGE_URI);
+      if (detail == null)
+      {
+        return getBrandingImageURI(scope.getParentScope());
+      }
+
+      imageURI = URI.createURI(detail);
+    }
+
+    if (imageURI == null)
+    {
+      imageURI = getEclipseBrandingImage();
+    }
+
+    return imageURI;
   }
 }

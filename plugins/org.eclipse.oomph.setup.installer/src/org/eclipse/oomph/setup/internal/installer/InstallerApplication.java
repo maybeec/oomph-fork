@@ -21,6 +21,7 @@ import org.eclipse.oomph.setup.ui.wizards.SetupWizard.SelectionMemento;
 import org.eclipse.oomph.ui.ErrorDialog;
 import org.eclipse.oomph.ui.UIUtil;
 import org.eclipse.oomph.util.IOUtil;
+import org.eclipse.oomph.util.OS;
 import org.eclipse.oomph.util.OomphPlugin.Preference;
 import org.eclipse.oomph.util.PropertiesUtil;
 
@@ -37,6 +38,7 @@ import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.dialogs.ProgressMonitorDialog;
 import org.eclipse.jface.operation.IRunnableWithProgress;
 import org.eclipse.jface.window.Window;
+import org.eclipse.osgi.service.datalocation.Location;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.widgets.Display;
@@ -44,6 +46,7 @@ import org.eclipse.swt.widgets.Shell;
 
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
+import java.net.URL;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -64,6 +67,17 @@ public class InstallerApplication implements IApplication
     // This must come very early, before the first model is accessed, so that HTTPS can be authorized.
     IProvisioningAgent agent = P2Util.getCurrentProvisioningAgent();
     agent.registerService(UIServices.SERVICE_NAME, Installer.SERVICE_UI);
+
+    Location location = Platform.getInstanceLocation();
+    if (location != null)
+    {
+      Location configurationLocation = Platform.getConfigurationLocation();
+      if (configurationLocation != null)
+      {
+        URL configurationLocationURL = configurationLocation.getURL();
+        location.set(configurationLocationURL, false);
+      }
+    }
 
     final InstallerUI[] installerDialog = { null };
 
@@ -219,7 +233,7 @@ public class InstallerApplication implements IApplication
           //$FALL-THROUGH$
         }
 
-        String launcher = getLauncher();
+        String launcher = OS.getCurrentLauncher(false);
         if (launcher != null)
         {
           try
@@ -407,25 +421,6 @@ public class InstallerApplication implements IApplication
   public void stop()
   {
     // Do nothing.
-  }
-
-  public static String getLauncher()
-  {
-    try
-    {
-      String launcher = PropertiesUtil.getProperty("eclipse.launcher");
-      if (launcher != null && new File(launcher).isFile())
-      {
-        return launcher;
-      }
-    }
-    catch (Throwable ex)
-    {
-      ex.printStackTrace();
-      //$FALL-THROUGH$
-    }
-
-    return null;
   }
 
   /**

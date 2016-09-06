@@ -15,6 +15,7 @@ import org.eclipse.oomph.internal.setup.SetupProperties;
 import org.eclipse.oomph.setup.internal.core.util.ECFURIHandlerImpl.AuthorizationHandler.Authorization;
 import org.eclipse.oomph.setup.internal.core.util.SetupCoreUtil;
 import org.eclipse.oomph.setup.ui.SetupUIPlugin;
+import org.eclipse.oomph.setup.util.SetupUtil;
 import org.eclipse.oomph.ui.OomphUIPlugin;
 import org.eclipse.oomph.ui.UIUtil;
 import org.eclipse.oomph.util.IORuntimeException;
@@ -32,6 +33,7 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.Job;
+import org.eclipse.equinox.security.storage.provider.PasswordProvider;
 import org.eclipse.jface.resource.JFaceResources;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.FontData;
@@ -123,12 +125,14 @@ public final class SetupInstallerPlugin extends OomphUIPlugin
     {
       super.start(context);
 
+      adjustDefaultPasswordProvider();
+
       if (PropertiesUtil.isProperty(SetupProperties.PROP_SETUP_USER_HOME_REDIRECT))
       {
         System.setProperty("user.home", new File(PropertiesUtil.getUserHome()).getCanonicalPath());
       }
 
-      if (!PropertiesUtil.isProperty(SetupUIPlugin.PREF_HEADLESS))
+      if (!PropertiesUtil.isProperty(SetupUIPlugin.PREF_HEADLESS) && !SetupUtil.SETUP_ARCHIVER_APPLICATION)
       {
         UIUtil.syncExec(new Runnable()
         {
@@ -174,6 +178,31 @@ public final class SetupInstallerPlugin extends OomphUIPlugin
           return authorization.isAuthorized() ? new PasswordAuthentication(authorization.getUser(), authorization.getPassword().toCharArray()) : null;
         }
       });
+    }
+
+    @SuppressWarnings("restriction")
+    private void adjustDefaultPasswordProvider()
+    {
+      org.eclipse.equinox.internal.security.storage.PasswordProviderSelector passwordProviderSelector = org.eclipse.equinox.internal.security.storage.PasswordProviderSelector
+          .getInstance();
+      try
+      {
+        org.eclipse.equinox.internal.security.storage.PasswordProviderModuleExt defaultProvider = passwordProviderSelector
+            .findStorageModule("org.eclipse.equinox.security.ui.DefaultPasswordProvider");
+        if (defaultProvider != null)
+        {
+          PasswordProvider passwordProvider = ReflectUtil.getValue("providerModule", defaultProvider);
+          if (org.eclipse.equinox.internal.security.ui.storage.DefaultPasswordProvider.class.equals(passwordProvider.getClass()))
+          {
+            InstallerUIPrompt installerUIPrompt = new InstallerUIPrompt();
+            ReflectUtil.setValue("providerModule", defaultProvider, installerUIPrompt);
+          }
+        }
+      }
+      catch (Exception ex)
+      {
+        INSTANCE.log(ex);
+      }
     }
 
     private void initializeFonts()

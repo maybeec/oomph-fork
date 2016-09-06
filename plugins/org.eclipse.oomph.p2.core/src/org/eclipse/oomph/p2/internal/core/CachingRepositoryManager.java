@@ -11,6 +11,7 @@
 package org.eclipse.oomph.p2.internal.core;
 
 import org.eclipse.oomph.util.CollectionUtil;
+import org.eclipse.oomph.util.OfflineMode;
 import org.eclipse.oomph.util.PropertiesUtil;
 import org.eclipse.oomph.util.ReflectUtil;
 import org.eclipse.oomph.util.ReflectUtil.ReflectionException;
@@ -38,6 +39,7 @@ import org.eclipse.equinox.internal.p2.repository.helpers.LocationProperties;
 import org.eclipse.equinox.internal.provisional.p2.core.eventbus.IProvisioningEventBus;
 import org.eclipse.equinox.internal.provisional.p2.core.eventbus.SynchronousProvisioningListener;
 import org.eclipse.equinox.internal.provisional.p2.repository.RepositoryEvent;
+import org.eclipse.equinox.p2.core.IAgentLocation;
 import org.eclipse.equinox.p2.core.IProvisioningAgent;
 import org.eclipse.equinox.p2.core.ProvisionException;
 import org.eclipse.equinox.p2.metadata.IArtifactKey;
@@ -115,6 +117,20 @@ public class CachingRepositoryManager<T>
   public CachingRepositoryManager(AbstractRepositoryManager<T> delegate, int repositoryType, CachingTransport transport)
   {
     this.delegate = delegate;
+
+    IAgentLocation agentLocation = ReflectUtil.getValue("agentLocation", delegate);
+    if (agentLocation != null)
+    {
+      URI rootLocation = agentLocation.getRootLocation();
+      if (rootLocation != null)
+      {
+        if (!LazyProfileRegistryComponent.OsgiHelper.canWrite(new File(rootLocation.getPath())))
+        {
+          ReflectUtil.setValue("agentLocation", delegate, null);
+        }
+      }
+    }
+
     this.repositoryType = repositoryType;
 
     if (transport == null)
@@ -523,22 +539,25 @@ public class CachingRepositoryManager<T>
               @Override
               public Set<java.util.Map.Entry<String, String>> entrySet()
               {
-                // If the request for the entry set occurs when p2 is determining the maximum number of threads allowed by the repository...
-                StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
-                if (stackTrace.length > 5 && "getMaximumThreads".equals(stackTrace[5].getMethodName()))
+                if (!OfflineMode.isEnabled())
                 {
-                  // If the repository itself doesn't restrict the maximum number of threads...
-                  String respositoryMaxThreads = get(SimpleArtifactRepository.PROP_MAX_THREADS);
-                  if (respositoryMaxThreads == null)
+                  // If the request for the entry set occurs when p2 is determining the maximum number of threads allowed by the repository...
+                  StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+                  if (stackTrace.length > 5 && "getMaximumThreads".equals(stackTrace[5].getMethodName()))
                   {
-                    // Initialize our specialized mirror selector.
-                    mirrorSelector.initMirrorActivities(new NullProgressMonitor());
+                    // If the repository itself doesn't restrict the maximum number of threads...
+                    String respositoryMaxThreads = get(SimpleArtifactRepository.PROP_MAX_THREADS);
+                    if (respositoryMaxThreads == null)
+                    {
+                      // Initialize our specialized mirror selector.
+                      mirrorSelector.initMirrorActivities(new NullProgressMonitor());
 
-                    // If there is no list of mirrors, allow 10 threads, otherwise, allow 10 threads per mirror or the global maximum, whichever is less.
-                    // Save that value as if it were a property in the repository.
-                    BetterMirrorSelector.MirrorActivity[] mirrorActivities = mirrorSelector.mirrorActivities;
-                    int maxThreads = mirrorActivities.length <= 1 ? 10 : Math.min(mirrorActivities.length * 10, Integer.parseInt(GLOBAL_MAX_THREADS));
-                    put(SimpleArtifactRepository.PROP_MAX_THREADS, Integer.toString(maxThreads));
+                      // If there is no list of mirrors, allow 10 threads, otherwise, allow 10 threads per mirror or the global maximum, whichever is less.
+                      // Save that value as if it were a property in the repository.
+                      BetterMirrorSelector.MirrorActivity[] mirrorActivities = mirrorSelector.mirrorActivities;
+                      int maxThreads = mirrorActivities.length <= 1 ? 10 : Math.min(mirrorActivities.length * 10, Integer.parseInt(GLOBAL_MAX_THREADS));
+                      put(SimpleArtifactRepository.PROP_MAX_THREADS, Integer.toString(maxThreads));
+                    }
                   }
                 }
 

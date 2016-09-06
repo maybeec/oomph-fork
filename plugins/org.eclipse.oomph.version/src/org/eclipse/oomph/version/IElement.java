@@ -34,6 +34,8 @@ public interface IElement
 
   public Version getResolvedVersion();
 
+  public boolean isFragment();
+
   public boolean isLicenseFeature();
 
   public List<IElement> getChildren();
@@ -53,6 +55,21 @@ public interface IElement
    */
   public static enum Type
   {
+    PRODUCT
+    {
+      @Override
+      public String getTag()
+      {
+        return "products";
+      }
+
+      @Override
+      public String toString()
+      {
+        return "Product";
+      }
+    },
+
     FEATURE
     {
       @Override
