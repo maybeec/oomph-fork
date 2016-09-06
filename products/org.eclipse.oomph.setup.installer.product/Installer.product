@@ -22,7 +22,7 @@ Eclipse Installer
       </programArgsLin>
       <vmArgs>-Xms256M
 -Xmx1024M
--Doomph.redirection.oasp=index:/redirectable.products.setup-&gt;https://raw.githubusercontent.com/themetalone/oomph-server/master/v1.0/com.github.products.oasp4j.setup
+-Doomph.redirection.oasp=index:/redirectable.products.setup-&gt;https://raw.githubusercontent.com/oasp/oasp4j-ide/master/oasp4j-ide-oomph-setups/com.github.products.oasp4j.setup
       </vmArgs>
       <vmArgsMac>-XstartOnFirstThread
 -Dorg.eclipse.swt.internal.carbon.smallFonts
@@ -46,6 +46,7 @@ Eclipse Installer
 
    <vm>
    </vm>
+
 
    <plugins>
    </plugins>
